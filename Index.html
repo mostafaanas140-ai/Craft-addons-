@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Craft Addons | Minecraft Mods</title>
+  <style>
+    body { margin:0; font-family: Arial, sans-serif; background:#0f172a; color:white; }
+    header { background:#22c55e; padding:25px; text-align:center; font-size:28px; font-weight:bold; }
+    .container { max-width:1100px; margin:auto; padding:20px; }
+    .mods-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:18px; margin-top:10px; }
+    .mod-card { background:#1e293b; border-radius:14px; padding:12px; text-align:center; transition:0.2s; }
+    .mod-card:hover { transform: translateY(-5px); }
+    .mod-card img { width:100%; height:140px; object-fit:cover; border-radius:10px; }
+    .mod-title { margin:10px 0 5px; font-weight:bold; font-size:16px; }
+    .mod-desc { font-size:13px; color:#cbd5e1; margin-bottom:10px; }
+    .download-btn, .share-btn { background:#22c55e; color:black; text-decoration:none; padding:8px 14px; border-radius:8px; display:inline-block; font-weight:bold; margin-top:5px; }
+    .share-form { display:none; flex-direction:column; gap:10px; margin-top:15px; background:#1e293b; padding:15px; border-radius:12px; }
+    .share-form input, .share-form textarea { padding:8px; border-radius:8px; border:none; width:100%; }
+    footer { margin-top:40px; padding:20px; text-align:center; color:#94a3b8; font-size:13px; }
+  </style>
+</head>
+<body onload="handleClientLoad()">
+
+<header>
+  Craft Addons
+  <div style="font-size:14px;font-weight:normal">أفضل مودات وإضافات Minecraft Bedrock</div>
+</header>
+
+<div class="container">
+
+  <!-- ترتيب المودات -->
+  <div style="margin-bottom:15px;text-align:center;">
+    <label for="sortSelect" style="margin-right:10px;font-weight:bold">ترتيب المودات:</label>
+    <select id="sortSelect" onchange="sortMods()">
+      <option value="newest">الأحدث</option>
+      <option value="mostDownloads">الأكثر تنزيلًا</option>
+    </select>
+  </div>
+
+  <!-- شبكة المودات -->
+  <div class="mods-grid" id="modsGrid">
+    <!-- المودات ستظهر هنا -->
+  </div>
+
+  <!-- رفع المودات -->
+  <div style="margin-top:40px;background:#1e293b;padding:20px;border-radius:14px;text-align:center">
+    <h2>📩 شارك مودك معنا</h2>
+    <p style="color:#cbd5e1;font-size:14px">املأ جميع الحقول، ثم اختر صورة من المعرض وملف المود:</p>
+    <button class="share-btn" onclick="document.getElementById('shareForm').style.display='flex'">شارك مودك هنا!</button>
+    <form id="shareForm" class="share-form" onsubmit="addMod(event)">
+      <input type="text" name="modName" placeholder="اسم المود" required />
+      <textarea name="modDesc" placeholder="وصف المود" rows="3" required></textarea>
+      <input type="file" name="modImage" accept="image/*" required />
+      <input type="file" name="modFile" accept=".mcpack,.mcaddon,.mcworld" required />
+      <button type="submit" class="share-btn">رفع المود</button>
+    </form>
+  </div>
+
+</div>
+
+<footer>
+  © 2026 Craft Addons - جميع الحقوق محفوظة
+</footer>
+
+<!-- Google API Client -->
+<script src="https://apis.google.com/js/api.js"></script>
+<script>
+let CLIENT_ID = 'ضع هنا الـ Client ID';
+let SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+function handleClientLoad() {
+  gapi.load('client:auth2', initClient);
+}
+
+function initClient() {
+  gapi.client.init({
+    clientId: CLIENT_ID,
+    scope: SCOPES
+  });
+}
+
+function signIn() {
+  gapi.auth2.getAuthInstance().signIn();
+}
+
+function uploadFile(file, callback) {
+  const metadata = { 'name': file.name, 'mimeType': file.type };
+  const accessToken = gapi.auth.getToken().access_token;
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], {type:'application/json'}));
+  form.append('file', file);
+
+  fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method:'POST',
+    headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
+    body: form
+  })
+  .then(response => response.json())
+  .then(data => {
+    const fileId = data.id;
+    const directLink = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    callback(directLink);
+  })
+  .catch(error => console.error(error));
+}
+
+function sortMods() {
+  const grid = document.getElementById('modsGrid');
+  const mods = Array.from(grid.children);
+  const sortBy = document.getElementById('sortSelect').value;
+  mods.sort((a,b) => {
+    if(sortBy==='newest') return b.dataset.date - a.dataset.date;
+    if(sortBy==='mostDownloads') return b.dataset.downloads - a.dataset.downloads;
+    return 0;
+  });
+  mods.forEach(mod => grid.appendChild(mod));
+}
+
+function addMod(event) {
+  event.preventDefault();
+  signIn(); // تسجيل الدخول قبل الرفع
+  const form = event.target;
+  const name = form.modName.value;
+  const desc = form.modDesc.value;
+  const imgFile = form.modImage.files[0];
+  const modFile = form.modFile.files[0];
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const imgUrl = e.target.result;
+
+    uploadFile(modFile, function(downloadUrl) {
+      const modCard = document.createElement('div');
+      modCard.className = 'mod-card';
+      modCard.dataset.date = Date.now();
+      modCard.dataset.downloads = 0;
+      modCard.innerHTML = `
+        <img src="${imgUrl}" />
+        <div class="mod-title">${name}</div>
+        <div class="mod-desc">${desc}</div>
+        <a class="download-btn" href="${downloadUrl}" download>تحميل</a>
+      `;
+      document.getElementById('modsGrid').appendChild(modCard);
+      form.reset();
+      form.style.display = 'none';
+      sortMods();
+    });
+  };
+  reader.readAsDataURL(imgFile);
+}
+</script>
+
+</body>
+</html>
